@@ -1,56 +1,97 @@
-from pathlib import Path
-import json
-from pprint import pprint
-from quixstreams import Application
+# Importerar nödvändiga bibliotek
+from pathlib import Path  # Hanterar filvägar på ett säkert sätt över olika operativsystem
+import json              # Hanterar JSON-data (läsning/skrivning)
+from pprint import pprint  # Pretty print - skriver ut data i ett läsbart format
+from quixstreams import Application  # Kafka-bibliotek för strömhantering
 
+# Path(__file__) ger sökvägen till nuvarande fil
+# .parent ger föräldrarmappen
+# / "data" lägger till "data" till sökvägen
 data_path = Path(__file__).parent / "data"
+print(f"datapath = {data_path}")
 
+# Öppnar JSON-filen i read-mode ('r')
+# with-statement säkerställer att filen stängs korrekt efter användning
 with open(data_path / "orders.json", "r") as file:
+    # json.load() konverterar JSON-text till Python-objekt (dict/list)
     orders = json.load(file)
 
-app = Application(broker_address="localhost:9092", consumer_group="show_order")
-order_topic = app.topic(name="orders", value_serializer="json")
+# pprint formaterar utskriften med indenteringar och radbrytningar
+# för bättre läsbarhet än vanlig print
+pprint(orders)
 
-def main():
-    with app.get_producer() as producer:
-        for order in orders:
-            # Konvertera order till JSON-sträng och sedan till bytes
-            order_json = json.dumps(order)
-            order_bytes = order_json.encode('utf-8')
+# Skapar en Application-instans för Kafka
+# Parametrar som MÅSTE anges:
+# - broker_address: adressen till Kafka-servern (format: "host:port")
+# - consumer_group: unikt namn för denna konsumentgrupp
+app = Application(
+    broker_address="localhost:9092",  # Standardport för Kafka
+    consumer_group="show_order"       # Valfritt gruppnamn
+)
 
-            # Konvertera key till string och sedan till bytes
-            key_bytes = str(order['order_id']).encode('utf-8')
+# Skapar en topic (en kanal i Kafka)
+# Parametrar som MÅSTE anges:
+# - name: namnet på topic
+# - value_serializer: hur data ska konverteras när det skickas
+order_topic = app.topic(
+    name="orders",        # Valfritt topic-namn
+    value_serializer="json"  # Anger att data ska serialiseras som JSON
+)
 
-            producer.produce(
-                topic="orders",
-                key=key_bytes,
-                value=order_bytes
-            )
+# Context manager för producer - säkerställer korrekt stängning
+# app.get_producer() skapar en ny producer-instans
+with app.get_producer() as producer:
+    # Itererar genom varje order i vår data
+    for order in orders:
+        # Serialiserar data för Kafka
+        # order_topic.serialize() konverterar Python-objekt till Kafka-meddelande
+        # Parametrar:
+        # - key: unik nyckel för meddelandet
+        # - value: själva data som ska skickas
+        kafka_msg = order_topic.serialize(key=order, value=order)
 
-            # Skriv ut order-information
+        # Itererar genom varje meddelande
+        for order in kafka_msg:
+            # Skriver ut orderinformation
             print(f"Input: {order}")
             print(f"Order ID: {order['order_id']}")
             print(f"Kund namn: {order['customer']}")
+
+            # Extraherar datum och status
             order_date = order['order_date']
             order_status = order['status']
             total = 0
 
+            # Bearbetar varje produkt i ordern
             for product in order['products']:
                 name = product['name']
-                price = product['price']
+                unit_price = product['price']
                 quantity = product['quantity']
-                if quantity > 1:
-                    price = price * quantity
-                total += price
+                total_price = unit_price * quantity
+                total += total_price
 
-                print(f"- Produktnamn: {name}")
-                print(f"- Pris: {price}")
+                # Anpassad utskrift beroende på kvantitet
+                if quantity > 1:
+                    print(f"- Produktnamn: {name} (Styckpris: {unit_price:.2f} kr, "
+                          f"Totalt: {total_price:.2f} kr)")
+                else:
+                    print(f"- Produktnamn: {name} (Pris: {unit_price:.2f} kr)")
                 print(f"- Antal: {quantity}")
 
+            # Skriver ut ordersammanfattning
             print(f"Order date: {order_date}")
             print(f"Order status: {order_status}")
-            print(f"Totalsumma: {total}")
+            print(f"Totalsumma: {total:.2f} kr")
             print("---")
 
-if __name__ == '__main__':
-    main()
+        # Skickar meddelandet till Kafka
+        # producer.produce() skickar data till angiven topic
+        # Parametrar som MÅSTE anges:
+        # - topic: namnet på topic att skicka till
+        # - key: unik identifierare för meddelandet
+        # - value: själva data som ska skickas
+        producer.produce(
+            topic="orders",
+            key=str(kafka_msg.key),    # Måste vara string
+            value=kafka_msg.value      # Redan serialiserat JSON
+        )

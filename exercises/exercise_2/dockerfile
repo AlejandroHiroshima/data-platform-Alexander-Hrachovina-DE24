@@ -1,0 +1,14 @@
+# base layer - starting from a existing image
+FROM python:3.9
+
+# instruction layer - where we will start in the container
+WORKDIR /app
+
+# instruction layer - copies everything from this folder in the host system into /app
+COPY src/ /app/
+
+# instruction layer - installing packages (runs bash command)
+RUN pip install matplotlib pandas
+
+# instruction layer - bash command to run when container is spun up
+CMD [ "python", "os_data.py" ]

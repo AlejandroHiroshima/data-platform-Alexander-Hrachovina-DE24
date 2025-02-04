@@ -8,7 +8,7 @@ data_path = Path(__file__).parents[1] / "data"
 # print(data_path)
 
 # läser in jokes.json genom sin absoluta path
-with open(data_path / "jokes.json", "r") as file:
+with open(data_path / "jokes.json", "r", encoding="utf-8") as file:
     jokes = json.load(file)
 
 # pprint(jokes)
@@ -32,10 +32,12 @@ def main():
 
             print(f"produced message: key = {kafka_msg.key}, value = {kafka_msg.value}")
 
-            producer.produce(topic="jokes", key= str(kafka_msg.key), value= kafka_msg.value)
+            producer.produce(
+                topic="jokes", key=str(kafka_msg.key), value=kafka_msg.value
+            )
 
 
-#runt this code only when executin this script and not when importing this module
-if __name__ == '__main__':
+# runt this code only when executin this script and not when importing this module
+if __name__ == "__main__":
     # pprint(jokes)
     main()
