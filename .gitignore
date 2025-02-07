@@ -172,3 +172,5 @@ cython_debug/
 
 # Mac generates trash artefacts
 .DS_store
+
+kafka_data
