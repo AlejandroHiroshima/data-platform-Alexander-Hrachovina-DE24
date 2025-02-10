@@ -1,6 +1,6 @@
-print("utanför if satsen")
+print("utanför main")
 print(__name__)
 
 if __name__ == '__main__':
     print(__name__)
-    print("hej")
+    print("innanför main")
