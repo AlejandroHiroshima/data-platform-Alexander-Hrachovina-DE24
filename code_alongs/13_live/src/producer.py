@@ -5,17 +5,16 @@ import json
 from pprint import pprint
 import time
 
-def get_latest_coin_data(target_symbol = "BTC"):
+
+def get_latest_coin_data(target_symbol="BTC"):
     API_URL = "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest"
-    
-    parameters = {
-    'convert':'USD',
-    'symbol': target_symbol
-    }
+
+    parameters = {"convert": "USD", 
+                  "symbol": target_symbol}
 
     headers = {
-    'Accepts': 'application/json',
-    'X-CMC_PRO_API_KEY': COINMARKET_API,
+        "Accepts": "application/json",
+        "X-CMC_PRO_API_KEY": COINMARKET_API,
     }
 
     session = Session()
@@ -24,23 +23,29 @@ def get_latest_coin_data(target_symbol = "BTC"):
     response = session.get(API_URL, params=parameters)
     return json.loads(response.text)["data"][target_symbol]
 
+
 def main():
-    app = Application(broker_address= "localhost:9092", consumer_group="coin_group")
-    coins_topic = app.topic(name="coins",value_serializer="json")
+    app = Application(broker_address="localhost:9092", consumer_group="coin_group")
+    coins_topic = app.topic(name="coins", value_serializer="json")
 
     with app.get_producer() as producer:
         while True:
             coin_latest = get_latest_coin_data("BTC")
 
-            kafka_message = coins_topic.serialize(key=coin_latest["symbol"], value=coin_latest)
+            kafka_message = coins_topic.serialize(
+                key=coin_latest["symbol"], value=coin_latest
+            )
 
-            print(f"Produce event with key = {kafka_message.key}, price = {coin_latest['quote']['USD']['price']}")
+            print(
+                f"Produce event with key = {kafka_message.key}, price = {coin_latest['quote']['USD']['price']}"
+            )
 
-            producer.produce(topic=coins_topic.name, key= kafka_message.key, value=kafka_message.value)
+            producer.produce(
+                topic=coins_topic.name, key=kafka_message.key, value=kafka_message.value
+            )
             time.sleep(10)
 
 
+if __name__ == "__main__":
 
-if __name__ == '__main__':
-    
     main()
